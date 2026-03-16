@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Firebase Auth Blog</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 700px; margin: auto; background: #f0f2f5; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .post-form { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 30px; display: none; }
+        input, textarea { width: 100%; margin-bottom: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        button { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-post { background: #007bff; color: white; width: 100%; }
+        .btn-login { background: #4285F4; color: white; }
+        .btn-logout { background: #dc3545; color: white; }
+        .post-card { background: white; padding: 20px; margin-bottom: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .user-info { font-size: 0.9rem; color: #555; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>🚀 My Blog</h1>
+        <div id="auth-section">
+            <button id="login-btn" class="btn-login">구글 로그인</button>
+        </div>
+    </div>
+
+    <div id="write-section" class="post-form">
+        <h3>새 글 작성하기</h3>
+        <input type="text" id="title" placeholder="제목">
+        <textarea id="content" rows="4" placeholder="내용을 입력하세요..."></textarea>
+        <button onclick="savePost()" class="btn-post">포스팅 하기</button>
+    </div>
+
+    <div id="posts"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAIhnKfNHtiykzDM9Ii3E0DUz48f_HFNZw",
+            authDomain: "blog-98c36.firebaseapp.com",
+            databaseURL: "https://blog-98c36-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "blog-98c36",
+            storageBucket: "blog-98c36.firebasestorage.app",
+            messagingSenderId: "359686589484",
+            appId: "1:359686589484:web:f66746df6fbbf712e89589"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        let currentUser = null;
+
+        // --- 로그인/로그아웃 로직 ---
+        document.getElementById('login-btn').addEventListener('click', () => {
+            signInWithPopup(auth, provider).catch(err => console.error(err));
+        });
+
+        window.logout = () => signOut(auth);
+
+        onAuthStateChanged(auth, (user) => {
+            const authSection = document.getElementById('auth-section');
+            const writeSection = document.getElementById('write-section');
+            
+            if (user) {
+                currentUser = user;
+                authSection.innerHTML = `<span class="user-info">${user.displayName}님</span> <button onclick="logout()" class="btn-logout">로그아웃</button>`;
+                writeSection.style.display = 'block';
+            } else {
+                currentUser = null;
+                authSection.innerHTML = `<button id="login-btn" class="btn-login">구글 로그인</button>`;
+                writeSection.style.display = 'none';
+                // 재등록 (innerHTML로 버튼이 새로 생성되었으므로 다시 연결)
+                document.getElementById('login-btn').addEventListener('click', () => signInWithPopup(auth, provider));
+            }
+        });
+
+        // --- 데이터 저장 로직 ---
+        window.savePost = function() {
+            const title = document.getElementById('title').value;
+            const content = document.getElementById('content').value;
+
+            if(title && content && currentUser) {
+                push(ref(db, 'posts'), {
+                    title: title,
+                    content: content,
+                    author: currentUser.displayName,
+                    date: new Date().toLocaleString()
+                });
+                document.getElementById('title').value = '';
+                document.getElementById('content').value = '';
+            }
+        };
+
+        // --- 데이터 로드 로직 ---
+        onValue(ref(db, 'posts'), (snapshot) => {
+            const postsDiv = document.getElementById('posts');
+            postsDiv.innerHTML = '';
+            const data = snapshot.val();
+            if(data) {
+                Object.values(data).reverse().forEach(post => {
+                    postsDiv.innerHTML += `
+                        <div class="post-card">
+                            <h3>${post.title}</h3>
+                            <p>${post.content}</p>
+                            <small>✍️ ${post.author} | ${post.date}</small>
+                        </div>
+                    `;
+                });
+            }
+        });
+    </script>
+</body>
+</html>
